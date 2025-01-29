@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مراسلة صناع أنمي عربي</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="message-header">
+            <img src="logo.png" alt="Logo" class="logo">
+            <h3>مراسلة صناع أنمي عربي</h3>
+        </div>
+        <div class="message-list" id="messages"></div>
+        <div class="input-area">
+            <input type="text" id="textInput" placeholder="أدخل رسالتك...">
+            <button onclick="sendText()">إرسال</button>
+        </div>
+    </div>
+
+    <div class="loader" id="loader">
+        <img src="loader.gif" alt="Loading">
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
