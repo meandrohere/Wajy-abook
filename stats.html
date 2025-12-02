@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الإحصائيات والتقديرات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        h1 { 
+            text-align: center; 
+            font-size: 32px; 
+            margin-bottom: 30px; 
+            color: #FFC107; 
+        }
+
+        /* Summary Cards */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: rgba(255,255,255,0.95);
+            color: #333;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .card h3 {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        .card p {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+
+        /* Tables and Details */
+        h2 {
+            font-size: 24px;
+            color: #FFC107;
+            border-bottom: 2px solid rgba(255, 193, 7, 0.5);
+            padding-bottom: 10px;
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            color: #333;
+        }
+        .data-table th, .data-table td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: right;
+        }
+        .data-table th {
+            background: #2a5298;
+            color: white;
+            font-weight: 600;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #f7f7f7;
+        }
+        .data-table tr:hover {
+            background-color: #e0e0e0;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .action-buttons button {
+            padding: 12px 25px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: 0.3s;
+            font-family: 'Cairo', sans-serif;
+        }
+        .btn-print { background: #4CAF50; color: white; }
+        .btn-print:hover { background: #43A047; }
+        .btn-back { background: #607D8B; color: white; }
+        .btn-back:hover { background: #546E7A; }
+        
+        /* Loading/Error */
+        #loading-message {
+            text-align: center;
+            font-size: 18px;
+            color: #FFEB3B;
+            margin-top: 50px;
+        }
+
+        /* Print Media Query */
+        @media print {
+            body { 
+                background: #fff !important; 
+                color: #000 !important; 
+                padding: 0; 
+                font-size: 11pt;
+            }
+            .container { 
+                box-shadow: none !important; 
+                border: none !important;
+                background: #fff !important;
+                max-width: none;
+                margin: 0;
+                padding: 10px;
+            }
+            .action-buttons, .btn-back {
+                display: none !important;
+            }
+            h1, h2 {
+                color: #000 !important;
+                border-color: #333 !important;
+            }
+            .data-table th {
+                background: #ccc !important;
+                color: #000 !important;
+            }
+            .data-table { break-inside: avoid; }
+            .summary-cards { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body onload="loadAnalytics()">
+
+    <div class="container">
+        <h1>📈 الإحصائيات والتقديرات والدراسات</h1>
+        
+        <div id="loading-message">يتم تحميل البيانات...</div>
+
+        <div id="analytics-content" style="display: none;">
+            
+            <div class="summary-cards" id="summary-cards">
+                </div>
+
+            <h2>أداء الأساتذة (متوسط الحضور)</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>الأستاذ/المادة</th>
+                        <th>عدد الطلاب</th>
+                        <th>إجمالي الحصص المنجزة (حاضر)</th>
+                        <th>متوسط نسبة حضور الطلاب (%)</th>
+                    </tr>
+                </thead>
+                <tbody id="teacher-performance-body">
+                    </tbody>
+            </table>
+            
+            <h2>سجلات الرواتب والدفعات</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>تاريخ الدفع</th>
+                        <th>الأستاذ</th>
+                        <th>الفترة المحسوبة</th>
+                        <th>المبلغ المدفوع (د.ج)</th>
+                        <th>عدد الحصص (المحسوبة)</th>
+                    </tr>
+                </thead>
+                <tbody id="salaries-records-body">
+                    </tbody>
+            </table>
+
+        </div>
+        
+        <div class="action-buttons">
+            <button class="btn-print" onclick="printAnalytics()">🖨️ طباعة التقرير</button>
+            <button class="btn-back" onclick="window.location.href='home.html'">العودة للصفحة الرئيسية</button>
+        </div>
+
+    </div>
+
+    <script>
+        let db;
+        const DB_NAME = "AttendanceSystemDB";
+        const DB_VERSION = 4; 
+
+        // --- IndexedDB Connection ---
+
+        function connectDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onsuccess = e => resolve(e.target.result);
+                
+                request.onerror = e => {
+                    console.error("Error connecting to IndexedDB:", e.target.error);
+                    reject(new DOMException("فشل الاتصال بقاعدة البيانات."));
+                };
+                
+                // يجب أن تكون المتاجر قد أنشئت بالفعل في ملفات أخرى
+                request.onupgradeneeded = e => {
+                    // لا يتم إنشاء أي شيء هنا، فقط لضمان فتح الاتصال
+                    console.log("Database upgrade triggered, but no stores created here.");
+                };
+            });
+        }
+        
+        // --- Main Analytics Loader ---
+
+        async function loadAnalytics() {
+            try {
+                db = await connectDB();
+                
+                document.getElementById("loading-message").style.display = 'none';
+                
+                // جلب جميع البيانات اللازمة
+                const teachers = await getAllData("teachers");
+                const salaries = await getAllData("salaries");
+                
+                // معالجة البيانات وبناء الإحصائيات
+                const stats = processData(teachers, salaries);
+                
+                // عرض النتائج
+                renderSummaryCards(stats);
+                renderTeacherPerformance(stats.teacherPerformance);
+                renderSalariesRecords(salaries);
+                
+                document.getElementById("analytics-content").style.display = 'block';
+
+            } catch (error) {
+                console.error("خطأ في تحميل الإحصائيات:", error);
+                document.getElementById("loading-message").innerHTML = 
+                    `<p style="color: #F44336;">⚠️ خطأ: ${error.message || 'فشل في تحميل البيانات.'}</p>`;
+            }
+        }
+        
+        // --- Helper Function: Get All Data from Store ---
+        
+        function getAllData(storeName) {
+            if (!db.objectStoreNames.contains(storeName)) {
+                return Promise.resolve([]); // المتجر غير موجود، نرجع مصفوفة فارغة
+            }
+            
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readonly");
+                const store = tx.objectStore(storeName);
+                
+                store.getAll().onsuccess = e => resolve(e.target.result);
+                store.onerror = e => reject(e.target.error);
+            });
+        }
+
+        // --- Core Data Processing ---
+
+        function processData(teachers, salaries) {
+            let totalStudents = 0;
+            let totalClasses = 0; // إجمالي الحصص الحاضرة في النظام
+            let totalSalaries = 0;
+            const teacherPerformance = [];
+
+            // 1. حساب إجمالي الرواتب
+            salaries.forEach(s => {
+                totalSalaries += parseFloat(s.teacherSalary);
+            });
+
+            // 2. تحليل أداء الأساتذة والطلاب
+            teachers.forEach(teacher => {
+                let teacherTotalStudents = teacher.students.length;
+                totalStudents += teacherTotalStudents;
+                
+                let totalPresentCount = 0; // مجموع حصص الحضور لكل طلاب الأستاذ
+                let totalAttemptedSessions = 0; // مجموع جميع الحصص التي كان من المفترض حضورها (حاضر + غائب)
+                
+                teacher.students.forEach(student => {
+                    const sessions = [];
+                    
+                    // جمع الحصص من history و attendance
+                    const history = student.history || [];
+                    const attendance = student.attendance || [];
+                    const attendanceTimes = student.attendanceTimes || [];
+
+                    history.forEach(batch => {
+                        batch.status.forEach((status, index) => {
+                            if (status !== 'transparent') sessions.push(status);
+                        });
+                    });
+                    
+                    attendance.forEach(status => {
+                         if (status !== 'transparent') sessions.push(status);
+                    });
+                    
+                    // حساب إجمالي الحضور والغياب (المحاولات)
+                    sessions.forEach(status => {
+                        if (status === 'present') {
+                            totalPresentCount++;
+                            totalClasses++; // تحديث الإجمالي العام
+                        }
+                        if (status === 'present' || status === 'absent') {
+                            totalAttemptedSessions++;
+                        }
+                    });
+                });
+                
+                // حساب متوسط نسبة الحضور للأستاذ
+                const averageAttendance = totalAttemptedSessions > 0 
+                    ? (totalPresentCount / totalAttemptedSessions) * 100 
+                    : 0;
+
+                teacherPerformance.push({
+                    name: teacher.name,
+                    subject: teacher.subject,
+                    studentCount: teacherTotalStudents,
+                    totalPresentCount: totalPresentCount,
+                    averageAttendance: averageAttendance.toFixed(2)
+                });
+            });
+            
+            // فرز الأداء (الأفضل أولاً)
+            teacherPerformance.sort((a, b) => b.averageAttendance - a.averageAttendance);
+
+
+            return {
+                totalTeachers: teachers.length,
+                totalStudents: totalStudents,
+                totalClasses: totalClasses,
+                totalSalaries: totalSalaries.toFixed(2),
+                teacherPerformance: teacherPerformance
+            };
+        }
+
+        // --- Rendering Functions ---
+
+        function renderSummaryCards(stats) {
+            const container = document.getElementById("summary-cards");
+            container.innerHTML = `
+                <div class="card">
+                    <h3>👥 عدد الأساتذة المسجلين</h3>
+                    <p>${stats.totalTeachers}</p>
+                </div>
+                <div class="card">
+                    <h3>📚 إجمالي عدد الطلاب</h3>
+                    <p>${stats.totalStudents}</p>
+                </div>
+                <div class="card">
+                    <h3>✔️ إجمالي الحصص المنجزة (حاضر)</h3>
+                    <p>${stats.totalClasses} حصة</p>
+                </div>
+                <div class="card">
+                    <h3>💰 إجمالي الرواتب المدفوعة</h3>
+                    <p>${stats.totalSalaries} د.ج</p>
+                </div>
+            `;
+        }
+
+        function renderTeacherPerformance(performanceData) {
+            const tbody = document.getElementById("teacher-performance-body");
+            tbody.innerHTML = ''; 
+
+            performanceData.forEach(p => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = `${p.name} (${p.subject})`;
+                row.insertCell().textContent = p.studentCount;
+                row.insertCell().textContent = p.totalPresentCount;
+                row.insertCell().textContent = `${p.averageAttendance}%`;
+                
+                // تلوين الصف لتمييز الأفضل والأقل أداء
+                const attendanceValue = parseFloat(p.averageAttendance);
+                if (attendanceValue >= 90) {
+                     row.style.backgroundColor = '#C8E6C9'; // أخضر فاتح
+                } else if (attendanceValue <= 60 && p.studentCount > 0) {
+                     row.style.backgroundColor = '#FFCDD2'; // أحمر فاتح
+                }
+            });
+        }
+        
+        function renderSalariesRecords(salaries) {
+            const tbody = document.getElementById("salaries-records-body");
+            tbody.innerHTML = ''; 
+            
+            // فرز الرواتب من الأحدث للأقدم
+            salaries.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
+
+            salaries.forEach(s => {
+                const row = tbody.insertRow();
+                // تنسيق تاريخ الدفع
+                const paymentDate = new Date(s.paymentDate).toLocaleDateString('ar-DZ'); 
+                
+                row.insertCell().textContent = paymentDate;
+                row.insertCell().textContent = s.teacherName;
+                row.insertCell().textContent = `${s.startDate} - ${s.endDate}`;
+                row.insertCell().textContent = `${parseFloat(s.teacherSalary).toFixed(2)} د.ج`;
+                row.insertCell().textContent = `${s.totalAttendedCount}`;
+            });
+            
+            if (salaries.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">لا توجد سجلات رواتب مدفوعة بعد.</td></tr>';
+            }
+        }
+
+        // --- Action Function ---
+
+        function printAnalytics() {
+            if (document.getElementById("analytics-content").style.display === 'none') {
+                alert("يرجى الانتظار حتى يتم تحميل البيانات.");
+                return;
+            }
+            // تستخدم الطباعة خاصية @media print في CSS لإخفاء عناصر التحكم
+            window.print();
+        }
+
+    </script>
+</body>
+</html>

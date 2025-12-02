@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النسخ الاحتياطي واستعادة البيانات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            text-align: center;
+        }
+        h1 { 
+            font-size: 30px; 
+            margin-bottom: 25px; 
+            color: #FFC107; 
+        }
+        .section {
+            background: rgba(255,255,255,0.95);
+            color: #333;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #1e3c72;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Cairo', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        /* زر النسخ الاحتياطي */
+        #backupButton {
+            background: #4CAF50; /* أخضر */
+            color: white;
+        }
+        #backupButton:hover { background: #43A047; }
+
+        /* زر الاستعادة */
+        #restoreButton {
+            background: #FF9800; /* برتقالي */
+            color: white;
+            margin-top: 15px;
+        }
+        #restoreButton:hover { background: #FB8C00; }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px dashed #ccc;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: #f8f8f8;
+            color: #333;
+        }
+        
+        .note {
+            font-size: 14px;
+            color: #777;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+        .danger-note {
+            color: #F44336;
+            font-weight: bold;
+        }
+        .back-button {
+            background: #607D8B;
+            color: white;
+            margin-top: 30px;
+        }
+        .back-button:hover { background: #546E7A; }
+    </style>
+</head>
+<body onload="connectDB()">
+
+    <div class="container">
+        <h1>⚙️ إدارة النسخ الاحتياطي والبيانات</h1>
+
+        <div class="section">
+            <h2>النسخ الاحتياطي (تصدير)</h2>
+            <p class="note">سيتم حفظ ملف يحتوي على جميع بيانات الأساتذة والطلاب والرواتب على جهازك.</p>
+            <button id="backupButton" onclick="exportData()">⬇️ تحميل النسخة الاحتياطية</button>
+        </div>
+
+        <div class="section">
+            <h2>استعادة البيانات (استيراد)</h2>
+            <p class="danger-note">تحذير: هذه العملية ستحذف البيانات الحالية وتستبدلها ببيانات الملف الذي تختاره.</p>
+            
+            <input type="file" id="restoreFile" accept=".json" onchange="enableRestoreButton()">
+            
+            <button id="restoreButton" onclick="importData()" disabled>⬆️ استعادة البيانات الآن</button>
+            <p class="note">اختر ملف **JSON** تم إنشاؤه مسبقاً بواسطة النظام.</p>
+        </div>
+        
+        <button class="back-button" onclick="window.location.href='home.html'">
+            العودة للصفحة الرئيسية
+        </button>
+
+    </div>
+
+    <script>
+        let db;
+        const DB_NAME = "AttendanceSystemDB";
+        const DB_VERSION = 4;
+        const STORE_NAMES = ["teachers", "salaries"];
+
+        // --- IndexedDB Connection ---
+
+        function connectDB() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onupgradeneeded = e => {
+                const db = e.target.result;
+                STORE_NAMES.forEach(storeName => {
+                    if (!db.objectStoreNames.contains(storeName)) {
+                        db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
+                    }
+                });
+            };
+
+            request.onsuccess = e => {
+                db = e.target.result;
+                console.log("IndexedDB connected.");
+            };
+            
+            request.onerror = e => {
+                console.error("Error opening IndexedDB:", e.target.error);
+                alert("خطأ في الاتصال بقاعدة البيانات.");
+            };
+        }
+
+        // --- Export/Backup Function ---
+
+        async function exportData() {
+            if (!db) {
+                alert("قاعدة البيانات غير متصلة بعد. حاول مرة أخرى.");
+                return;
+            }
+
+            const data = {};
+            try {
+                // نستخدم Promise.all لجلب البيانات من جميع المتاجر بالتوازي
+                const promises = STORE_NAMES.map(storeName => {
+                    return new Promise((resolve, reject) => {
+                        const tx = db.transaction(storeName, "readonly");
+                        const store = tx.objectStore(storeName);
+                        store.getAll().onsuccess = e => {
+                            data[storeName] = e.target.result;
+                            resolve();
+                        };
+                        tx.onerror = reject;
+                    });
+                });
+
+                await Promise.all(promises);
+
+                const jsonString = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                // إنشاء رابط التنزيل
+                const a = document.createElement('a');
+                a.href = url;
+                const date = new Date().toISOString().substring(0, 10);
+                a.download = `backup_AttendanceSystemDB_${date}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                alert("✅ تم إنشاء النسخة الاحتياطية بنجاح!");
+
+            } catch (error) {
+                console.error("فشل في تصدير البيانات:", error);
+                alert("فشل في إنشاء النسخة الاحتياطية. راجع سجل الأخطاء.");
+            }
+        }
+
+        // --- Import/Restore Functions ---
+        
+        function enableRestoreButton() {
+            const fileInput = document.getElementById('restoreFile');
+            document.getElementById('restoreButton').disabled = !fileInput.files.length;
+        }
+
+        function importData() {
+            if (!confirm("هل أنت متأكد من استعادة البيانات؟ سيتم حذف جميع البيانات الحالية واستبدالها!")) {
+                return;
+            }
+            
+            if (!db) {
+                alert("قاعدة البيانات غير متصلة بعد. حاول مرة أخرى.");
+                return;
+            }
+            
+            const file = document.getElementById('restoreFile').files[0];
+            if (!file) {
+                alert("الرجاء اختيار ملف JSON للاستعادة.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    await clearAndPopulateDB(importedData);
+                    alert("🎉 تم استعادة البيانات بنجاح! يرجى إعادة تحميل صفحات النظام.");
+                    window.location.reload(); 
+                } catch (error) {
+                    console.error("خطأ في معالجة ملف الاستعادة:", error);
+                    alert("فشل في استعادة البيانات. تأكد من أن الملف بصيغة JSON صحيحة.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function clearAndPopulateDB(data) {
+            // يتم حذف جميع البيانات القديمة وإدخال الجديدة
+            const tx = db.transaction(STORE_NAMES, "readwrite");
+            
+            for (const storeName of STORE_NAMES) {
+                if (data[storeName]) {
+                    const store = tx.objectStore(storeName);
+                    
+                    // 1. حذف جميع البيانات الموجودة
+                    await new Promise(resolve => {
+                        store.clear().onsuccess = resolve;
+                    });
+                    
+                    // 2. إدخال البيانات الجديدة
+                    data[storeName].forEach(item => {
+                        // يجب إعادة إدخالها كـ add() وليس put() لتجنب تضارب الـ primary keys إذا كان موجوداً
+                        // لكننا نستخدم put للحفاظ على الـ ID نفسه (لتجنب كسر الروابط)
+                        store.put(item).onerror = (e) => {
+                             console.warn(`فشل في إدخال العنصر في ${storeName}:`, item, e.target.error);
+                        };
+                    });
+                }
+            }
+            
+            return new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = reject;
+            });
+        }
+
+    </script>
+</body>
+</html>
