@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كشف الرواتب</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* (احتفظ بجميع أكواد CSS كما هي) */
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #2a5298, #1e3c72);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        h1 { 
+            text-align: center; 
+            font-size: 32px; 
+            margin-bottom: 30px; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            color: #FFC107; 
+        }
+
+        /* Input Controls */
+        .controls {
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 10px;
+            color: #333;
+            margin-bottom: 25px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .controls select, .controls input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-family: 'Cairo', sans-serif;
+        }
+        .controls button {
+            grid-column: span 2;
+            background: #2196f3; 
+            color: white;
+            font-weight: bold;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .controls button:hover { background: #1976D2; }
+
+        /* Salary Slip Style (Output) */
+        #slip-output {
+            background: #fff;
+            color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            min-height: 300px;
+            border: 2px dashed #FFC107;
+        }
+        .slip-header {
+            text-align: center;
+            border-bottom: 3px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .slip-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+        .slip-details strong { font-size: 16px; }
+
+        /* Summary Table */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .summary-table th, .summary-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: right;
+        }
+        .summary-table th { background: #f2f2f2; }
+        .total-row td {
+            background: #FFECB3;
+            font-weight: bold;
+            color: #e65100;
+        }
+        .net-salary-row td {
+             background: #C8E6C9; 
+             font-weight: bold;
+             color: #388E3C;
+        }
+
+        /* Signature Area */
+        .signature-area {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+        .signature-box {
+            width: 45%;
+            border-bottom: 1px solid #333;
+            padding: 20px 0 5px;
+            font-size: 14px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .action-buttons button {
+            flex: 1;
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-print { background: #4CAF50; color: white; }
+        .btn-save { background: #F44336; color: white; } /* تم تغيير اللون لتمييز زر التنزيل/الدفع */
+        
+        #teacherSelect option[style*="color: rgb(244, 67, 54)"] {
+             font-weight: bold;
+        }
+        
+        /* Media Query for Print */
+        @media print {
+            body { background: #fff !important; color: #000 !important; padding: 0; }
+            .container { 
+                box-shadow: none !important; 
+                border: none !important;
+                background: #fff !important;
+                max-width: none;
+                margin: 0;
+                padding: 20px;
+            }
+            .controls, .action-buttons, button[onclick*="window.location.href"] {
+                display: none !important;
+            }
+            #slip-output {
+                border: 1px solid #000;
+                min-height: auto;
+            }
+            /* إزالة الرأس والتذييل الافتراضي للطباعة */
+            @page { margin: 0; }
+            .slip-header, .summary-table { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body onload="loadTeachersAndSettings()">
+
+    <div class="container">
+        <h1>💵 كشف رواتب الأستاذ</h1>
+        
+        <div class="controls">
+            <select id="teacherSelect" required>
+                <option value="">-- اختر الأستاذ --</option>
+            </select>
+            <input type="number" id="teacherShare" placeholder="نسبة الأستاذ (%)" required>
+            
+            <input type="date" id="startDate" style="display: none;">
+            <input type="date" id="endDate" style="display: none;">
+            
+            <p id="period-info" style="grid-column: span 2; font-weight: bold; margin: 0; color: #333; text-align: center; background: #e0e0e0; padding: 10px; border-radius: 5px;">
+                الرجاء اختيار أستاذ لتحديد فترة الدفع تلقائياً.
+            </p>
+            
+            <button onclick="generateSalarySlip()">توليد كشف الراتب</button>
+        </div>
+        
+        <p style="text-align:center; color:#FFEB3B; margin-bottom: 15px; font-weight: bold;">
+            *ملاحظة: لحساب الأجر يجب تحديد "سعر الحصة الواحدة" للأستاذ في الصفحة الرئيسية.
+        </p>
+
+        <div id="slip-output">
+             <p style="text-align: center; color: #777;">يرجى اختيار الأستاذ والفترة الزمنية لتوليد الكشف.</p>
+        </div>
+        
+        <div class="action-buttons" id="slip-actions" style="display: none;">
+            <button class="btn-print" onclick="printSlip()">🖨️ طباعة</button>
+            <button class="btn-save" onclick="saveAndDownloadSlip()">💾 تسجيل الدفع وتنزيل الكشف</button>
+        </div>
+
+        <button onclick="window.location.href='home.html'" style="background: #607D8B; margin-top: 20px;">
+            العودة للصفحة الرئيسية
+        </button>
+
+    </div>
+
+    <script>
+        let db;
+        const DB_NAME = "AttendanceSystemDB";
+        const DB_VERSION = 4; // يجب أن تتطابق مع الإصدار في stu.html
+        let schoolName = "المدرسة"; 
+        let managerName = "المدير"; 
+        let generatedSlipData = null; 
+
+        // --- IndexedDB Connection Functions ---
+
+        async function connectDB(dbName, version) {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(dbName, version);
+                
+                request.onsuccess = e => resolve(e.target.result);
+                
+                // تحسين معالجة الأخطاء
+                request.onerror = e => {
+                    const error = e.target.error;
+                    console.error(`خطأ في الاتصال بـ IndexedDB (${dbName}):`, error);
+                    reject(new DOMException(`فشل الاتصال بـ ${dbName}. خطأ: ${error.name}`));
+                };
+                
+                // ** هذا الجزء يضمن إنشاء متجر salaries و users عند الترقية **
+                request.onupgradeneeded = e => {
+                    const db = e.target.result;
+                    // 1. متجر الرواتب في قاعدة AttendanceSystemDB
+                    if(dbName === "AttendanceSystemDB" && !db.objectStoreNames.contains("salaries")) {
+                         db.createObjectStore("salaries", { keyPath: "id", autoIncrement: true });
+                         console.log("Salaries store created in AttendanceSystemDB.");
+                    }
+                    // 2. متجر المستخدمين في قاعدة sectionsManagerDB
+                    if(dbName === "sectionsManagerDB" && !db.objectStoreNames.contains("users")) {
+                         // يجب استخدام الإصدار 3 لإنشاء متجر المستخدمين
+                         db.createObjectStore("users", { autoIncrement: true }); 
+                         console.log("Users store created in sectionsManagerDB.");
+                    }
+                    // ملاحظة: متجر 'teachers' يجب أن يتم إنشاؤه في ملف إدارة الطلاب (stu.html)
+                };
+            });
+        }
+        
+        // --- Helper Function: Get Last Payment Date ---
+        
+        async function getLastPaymentDate(teacherId) {
+            // تحقق من الاتصال بـ db
+            if (!db) return null;
+            
+            return new Promise(resolve => {
+                // تحقق من وجود متجر salaries
+                if (!db.objectStoreNames.contains("salaries")) {
+                    console.warn("متجر 'salaries' غير موجود. لا يمكن جلب تواريخ الدفع السابقة.");
+                    return resolve(null);
+                }
+                
+                const tx = db.transaction("salaries", "readonly");
+                const store = tx.objectStore("salaries");
+                
+                const request = store.getAll();
+                request.onsuccess = e => {
+                    const salaries = e.target.result
+                        .filter(s => s.teacherId == teacherId);
+
+                    if (salaries.length > 0) {
+                        // الفرز حسب التاريخ للحصول على الأحدث
+                        salaries.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
+
+                        // نأخذ تاريخ الدفع ونضيف يوماً ليبدأ الحساب بعده
+                        const lastPayment = new Date(salaries[0].paymentDate);
+                        lastPayment.setDate(lastPayment.getDate() + 1); 
+                        resolve(lastPayment); // اليوم التالي لآخر دفع
+                    } else {
+                        resolve(null); // لا يوجد دفع سابق
+                    }
+                };
+                request.onerror = () => {
+                     console.error("فشل في جلب سجلات الدفع السابقة.");
+                     resolve(null);
+                };
+            });
+        }
+
+        // --- Initialization and Data Loading ---
+        
+        async function loadTeachersAndSettings() {
+            try {
+                // 1. الاتصال بقاعدة بيانات الحضور
+                db = await connectDB(DB_NAME, DB_VERSION);
+                
+                // 1.1 التأكد من وجود متجر 'teachers' (المفتاح لجلب البيانات)
+                if (!db.objectStoreNames.contains("teachers")) {
+                    document.getElementById("slip-output").innerHTML = `<p style="text-align: center; color: #F44336; font-weight: bold;">⚠️ خطأ: متجر 'teachers' غير موجود. يرجى التأكد من تشغيل ملف إدارة الطلاب (stu.html) لإنشاء الأساتذة أولاً.</p>`;
+                    throw new Error("متجر 'teachers' غير موجود.");
+                }
+
+                // 2. جلب الأساتذة لملء قائمة الاختيار
+                const tx = db.transaction("teachers", "readonly");
+                const teachers = await new Promise(resolve => {
+                    tx.objectStore("teachers").getAll().onsuccess = e => resolve(e.target.result);
+                });
+
+                const select = document.getElementById("teacherSelect");
+                
+                // جلب تواريخ الدفع بالتوازي لتحسين الأداء
+                const teacherPromises = teachers.map(async t => {
+                    const lastPaymentDate = await getLastPaymentDate(t.id);
+                    const today = new Date();
+                    const calculationStartDate = lastPaymentDate || new Date('2000-01-01');
+
+                    const diffTime = Math.abs(today - calculationStartDate);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    return { t, diffDays, lastPaymentDate };
+                });
+                
+                const teachersWithStatus = await Promise.all(teacherPromises);
+
+
+                for (const { t, diffDays, lastPaymentDate } of teachersWithStatus) {
+                    const option = document.createElement("option");
+                    option.value = t.id;
+                    option.textContent = `${t.name} - ${t.subject} (سعر الحصة: ${t.pricePerClass || 0})`;
+                    option.dataset.teacher = JSON.stringify(t); 
+                    
+                    // --- منطق التنبيه باللون الأحمر (تم الاحتفاظ به كتحذير) ---
+                    if (diffDays >= 30) {
+                        option.style.color = '#F44336'; // أحمر
+                        option.textContent += ' ⚠️ (حان موعد الدفع/مر شهر)';
+                    }
+                    
+                    select.appendChild(option);
+                }
+
+                // 3. جلب بيانات المدير والمدرسة (جعل هذا الاتصال اختيارياً)
+                try {
+                    const managerDB = await connectDB("sectionsManagerDB", 3);
+                    
+                    if (managerDB.objectStoreNames.contains("users")) {
+                         const managerTx = managerDB.transaction("users", "readonly");
+                         const users = await new Promise(resolve => {
+                             managerTx.objectStore("users").getAll().onsuccess = e => resolve(e.target.result);
+                         });
+                         
+                         if (users.length > 0) {
+                             schoolName = users[0].school || "المدرسة";
+                             managerName = users[0].manager || "المدير";
+                         }
+                    } else {
+                         console.warn("متجر 'users' غير موجود في sectionsManagerDB. استخدام الأسماء الافتراضية.");
+                    }
+                } catch(managerError) {
+                     console.warn("فشل الاتصال بـ sectionsManagerDB، سيتم استخدام الأسماء الافتراضية.", managerError);
+                }
+                
+                // أضف مستمع لتحديث الفترة عند اختيار أستاذ
+                select.addEventListener('change', updatePeriodInfo);
+                
+            } catch (error) {
+                console.error("خطأ في التحميل الرئيسي:", error);
+                // تحديث رسالة الخطأ للمستخدم
+                if (!error.message.includes("teachers")) {
+                    alert(`فشل في تحميل بيانات الأساتذة والإعدادات. تأكد من تشغيل الملفات عبر خادم ويب (HTTP). خطأ: ${error.message}`);
+                }
+            }
+        }
+        
+        async function updatePeriodInfo() {
+            const selectElement = document.getElementById("teacherSelect");
+            const teacherId = selectElement.value;
+            const periodInfo = document.getElementById("period-info");
+            
+            if (!teacherId) {
+                periodInfo.textContent = "الرجاء اختيار أستاذ لتحديد فترة الدفع تلقائياً.";
+                return;
+            }
+            
+            // ملاحظة: نتأكد من أن db موجود قبل الاتصال بـ getLastPaymentDate
+            if (!db) {
+                 periodInfo.textContent = "خطأ في الاتصال بقاعدة البيانات. لا يمكن تحديد الفترة.";
+                 return;
+            }
+            
+            const lastPaymentDate = await getLastPaymentDate(teacherId);
+            const endDate = new Date(); 
+            let startDate;
+
+            if (lastPaymentDate) {
+                startDate = lastPaymentDate;
+            } else {
+                // إذا لم يوجد دفع سابق، نبدأ من بداية تاريخ افتراضي
+                startDate = new Date('2000-01-01'); 
+            }
+            
+            // تنسيق التاريخ للعرض
+            const startDisplay = startDate.toLocaleDateString('ar-DZ', { year: 'numeric', month: 'numeric', day: 'numeric' });
+            const endDisplay = endDate.toLocaleDateString('ar-DZ', { year: 'numeric', month: 'numeric', day: 'numeric' });
+            
+            periodInfo.textContent = `فترة الحساب: من ${startDisplay} إلى ${endDisplay}`;
+            
+            // تخزين التواريخ في الحقول المخفية للاستخدام في generateSalarySlip
+            // استخدام toISOString().substring(0, 10) لتعبئة حقل input type="date"
+            document.getElementById("startDate").value = startDate.toISOString().substring(0, 10);
+            document.getElementById("endDate").value = endDate.toISOString().substring(0, 10);
+        }
+
+        // --- Core Salary Generation Logic ---
+
+        async function generateSalarySlip() {
+            const selectElement = document.getElementById("teacherSelect");
+            const teacherId = selectElement.value;
+            const shareInput = document.getElementById("teacherShare");
+            const share = parseFloat(shareInput.value) / 100;
+            
+            if (!teacherId || isNaN(share) || share <= 0 || share > 1) {
+                alert("يرجى اختيار الأستاذ وتحديد نسبة الأستاذ (بين 1% و 100%) بشكل صحيح.");
+                shareInput.focus();
+                return;
+            }
+
+            const teacherData = JSON.parse(selectElement.options[selectElement.selectedIndex].dataset.teacher);
+            const pricePerClass = teacherData.pricePerClass || 0;
+
+            if (pricePerClass === 0) {
+                alert("⚠️ لا يمكن حساب الراتب: يرجى تحديد 'سعر الحصة الواحدة' للأستاذ في صفحة إدارة الطلاب أولاً.");
+                return;
+            }
+            
+            // استخدام التواريخ المحددة تلقائياً
+            await updatePeriodInfo(); 
+            
+            // نحتاج لقراءة القيم من حقول الإدخال المخفية
+            const startDateValue = document.getElementById("startDate").value;
+            const endDateValue = document.getElementById("endDate").value;
+            
+            const startDate = new Date(startDateValue);
+            // لضمان شمول يوم النهاية بالكامل، نضبط الوقت إلى نهاية اليوم (23:59:59)
+            const endDate = new Date(endDateValue);
+            endDate.setHours(23, 59, 59, 999);
+
+
+            let totalRevenue = 0;
+            let totalAttendedCount = 0;
+
+            teacherData.students.forEach(student => {
+                const sessionsToProcess = [];
+                const presentStatus = 'present';
+
+                // 1. جمع الحصص الحاضرة من الـ history
+                if (student.history) {
+                    student.history.forEach((batch) => {
+                        batch.status.forEach((status, index) => {
+                            if (status === presentStatus && batch.times && batch.times[index]) {
+                                sessionsToProcess.push({
+                                    time: new Date(batch.times[index]),
+                                    status: status
+                                });
+                            }
+                        });
+                    });
+                }
+                // 2. جمع الحصص الحاضرة من الـ attendance الحالية
+                if (student.attendance) {
+                    student.attendance.forEach((status, index) => {
+                        if (status === presentStatus && student.attendanceTimes && student.attendanceTimes[index]) {
+                            sessionsToProcess.push({
+                                time: new Date(student.attendanceTimes[index]),
+                                status: status
+                            });
+                        }
+                    });
+                }
+                
+                // 3. فلترة الحصص حسب الفترة الزمنية المحددة
+                sessionsToProcess.forEach(session => {
+                    // نستخدم فقط الحصص التي وقعت بين تاريخ بداية الحساب وتاريخ اليوم
+                    if (session.time >= startDate && session.time <= endDate) {
+                        // ** حساب الإيراد: سعر الحصة الواحدة لكل حصة حضرت **
+                        totalRevenue += pricePerClass; 
+                        totalAttendedCount++;
+                    }
+                });
+            });
+
+            // حساب الإجمالي المستحق للأستاذ (حصة الأستاذ)
+            const teacherSalary = totalRevenue * share;
+
+            // إعداد بيانات الكشف للحفظ
+            generatedSlipData = {
+                teacherId: teacherData.id,
+                teacherName: teacherData.name,
+                subject: teacherData.subject,
+                // حفظ التواريخ للعرض فقط (بدون وقت)
+                startDate: startDate.toLocaleDateString('ar-DZ'),
+                endDate: new Date(endDateValue).toLocaleDateString('ar-DZ'), // استخدام تاريخ النهاية بدون وقت
+                share: share,
+                totalRevenue: totalRevenue.toFixed(2),
+                totalAttendedCount: totalAttendedCount,
+                teacherSalary: teacherSalary.toFixed(2),
+                paymentDate: new Date().toISOString(), // حفظ التاريخ بالصيغة الدولية لسهولة الفرز
+                pricePerClass: pricePerClass
+            };
+            
+            // تحقق إذا كان لا يوجد حصص لحساب الراتب
+            if (totalAttendedCount === 0) {
+                document.getElementById("slip-output").innerHTML = `<p style="text-align: center; color: #777;">لا توجد حصص مُنجزة ومُضافة للإيراد بين تاريخ ${generatedSlipData.startDate} و ${generatedSlipData.endDate}.</p>`;
+                document.getElementById("slip-actions").style.display = 'none';
+                return;
+            }
+
+            // عرض الكشف
+            renderSalarySlip(generatedSlipData);
+            document.getElementById("slip-actions").style.display = 'flex';
+        }
+
+        function renderSalarySlip(data) {
+            const output = document.getElementById("slip-output");
+            
+            output.innerHTML = `
+                <div class="slip-header">
+                    <h2>كشف راتب الأستاذ</h2>
+                    <p>${schoolName}</p>
+                </div>
+                
+                <div class="slip-details">
+                    <div><strong>الأستاذ:</strong> ${data.teacherName}</div>
+                    <div><strong>المادة:</strong> ${data.subject}</div>
+                    <div><strong>الفترة:</strong> ${data.startDate} - ${data.endDate}</div>
+                    <div><strong>تاريخ الإصدار:</strong> ${new Date().toLocaleDateString('ar-DZ')}</div>
+                </div>
+
+                <h3>ملخص الحضور والإيراد</h3>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>البيان</th>
+                            <th>العدد/القيمة (د.ج)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>قيمة الحصة الواحدة المعتمدة</td>
+                            <td>${data.pricePerClass} د.ج</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td>**إجمالي عدد الحصص الحاضرة في الفترة**</td>
+                            <td>**${data.totalAttendedCount} حصة**</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td>**إجمالي الإيراد (الربح من الحصص)**</td>
+                            <td>**${data.totalRevenue} د.ج**</td>
+                        </tr>
+                        <tr>
+                            <td>نسبة الأستاذ المتفق عليها</td>
+                            <td>${(data.share * 100).toFixed(0)}%</td>
+                        </tr>
+                        <tr class="net-salary-row">
+                            <td>**صافي الأجر المستحق للأستاذ**</td>
+                            <td>**${data.teacherSalary} د.ج**</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>توقيعات الاستلام</h3>
+                <div class="signature-area">
+                    <div class="signature-box">
+                        توقيع الأستاذ (للتأكيد على الاستلام)
+                    </div>
+                    <div class="signature-box">
+                        توقيع المدير (${managerName})
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Action Functions ---
+
+        // دالة مدمجة لتسجيل الدفع وتحميل الكشف
+        function saveAndDownloadSlip() {
+            if (!generatedSlipData) {
+                alert("يرجى توليد كشف الراتب أولاً.");
+                return;
+            }
+            
+            // 1. تسجيل الدفع (نفس منطق saveSalarySlip القديم)
+            saveSalaryRecord().then(success => {
+                if (success) {
+                    // 2. تحميل الكشف كملف
+                    downloadSlip();
+                    
+                    // 3. تحديث الواجهة بعد الحفظ والتحميل
+                    generatedSlipData = null; 
+                    document.getElementById("slip-actions").style.display = 'none';
+                    document.getElementById("slip-output").innerHTML = `<p style="text-align: center; color: #777;">تم تسجيل الدفع بنجاح. يرجى اختيار أستاذ آخر.</p>`;
+                }
+            });
+        }
+        
+        // دالة منفصلة لحفظ السجل في IndexedDB
+        function saveSalaryRecord() {
+            return new Promise(resolve => {
+                // تحقق نهائي من وجود متجر salaries
+                if (!db.objectStoreNames.contains("salaries")) {
+                    alert("⚠️ خطأ: متجر 'salaries' غير موجود. لا يمكن حفظ الدفع. يرجى مراجعة إعدادات قاعدة البيانات.");
+                    return resolve(false);
+                }
+
+                const tx = db.transaction("salaries", "readwrite");
+                const store = tx.objectStore("salaries");
+                
+                const addReq = store.add(generatedSlipData); 
+                
+                addReq.onsuccess = () => {
+                    alert(`تم حفظ سجل الدفع بنجاح! المبلغ المدفوع: ${generatedSlipData.teacherSalary} د.ج. سيتم تنزيل الكشف الآن.`);
+                    loadTeachersAndSettings(); // نطلب إعادة تحميل الأساتذة لتحديث اللون الأحمر
+                    resolve(true);
+                };
+                addReq.onerror = (e) => {
+                    console.error("Failed to save salary record:", e.target.error);
+                    alert("فشل في حفظ سجل الدفع.");
+                    resolve(false);
+                };
+            });
+        }
+
+
+        // دالة جديدة لتنزيل كشف الراتب كملف HTML
+        function downloadSlip() {
+            // نحصل على محتوى الكشف من العنصر #slip-output
+            const slipContent = document.getElementById("slip-output").innerHTML;
+            
+            // نحتاج إلى تضمين الـ CSS ليكون الملف قابلاً للعرض بشكل صحيح عند فتحه
+            const styleContent = document.querySelector('style').innerHTML;
+            
+            // بناء ملف HTML كامل
+            const htmlContent = `
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>كشف راتب ${generatedSlipData.teacherName}</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+                    <style>${styleContent}</style>
+                    <style>
+                        /* إخفاء الأزرار والعناصر الإضافية عند عرض الملف المنفرد */
+                        .controls, .action-buttons, button[onclick*="window.location.href"] { display: none !important; }
+                        body { background: #fff !important; color: #333 !important; padding: 20px; }
+                        .container { 
+                            max-width: 800px;
+                            margin: 0 auto;
+                            box-shadow: none;
+                            background: #fff;
+                        }
+                        #slip-output { border: 1px solid #000; min-height: auto; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        ${slipContent}
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `كشف_راتب_${generatedSlipData.teacherName}_${new Date().toLocaleDateString('en-CA')}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function printSlip() {
+            if (!generatedSlipData) {
+                alert("يرجى توليد كشف الراتب أولاً.");
+                return;
+            }
+            
+            // تستخدم الطباعة خاصية @media print في CSS لإخفاء عناصر التحكم
+            window.print();
+        }
+
+    </script>
+</body>
+</html>
