@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الصفحة الرئيسية - نظام إدارة الأقسام</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Cairo', sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 20px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .school-name { font-size: 26px; font-weight: bold; margin-bottom: 8px; }
+    .manager-name { font-size: 20px; color: #a8e6cf; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 25px;
+      padding: 40px 20px;
+      width: 100%;
+      max-width: 1100px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(12px);
+      padding: 25px 15px;
+      border-radius: 18px;
+      text-align: center;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+      text-decoration: none;
+      color: white;
+    }
+    .card:hover {
+      transform: translateY(-10px) scale(1.05);
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .card img {
+      width: 70px;
+      height: 70px;
+      margin-bottom: 15px;
+      filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
+    }
+    .card div {
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="school-name" id="school-name-display">جاري تحميل اسم المدرسة...</div>
+    <div class="manager-name">مرحباً بك، <span id="manager-name-display">المدير</span> تم</div>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="att.html">
+      <img src="https://img.icons8.com/ios-filled/100/ffffff/attendance-mark.png" alt="الحضور">
+      <div>تسجيل الحضور والغياب</div>
+    </a>
+
+    <a class="card" href="stu.html">
+      <img src="https://img.icons8.com/ios-filled/100/ffffff/classroom.png" alt="تلاميذ">
+      <div>إدارة التلاميذ</div>
+    </a>
+
+    <a class="card" href="debts.html">
+      <img src="https://img.icons8.com/ios-filled/100/ffffff/money-bag.png" alt="ديون">
+      <div>متابعة الديون</div>
+    </a>
+
+    <a class="card" href="payroll.html">
+      <img src="https://img.icons8.com/ios-filled/100/ffffff/payroll.png" alt="راتب">
+      <div>كشف الرواتب</div>
+    </a>
+
+    <a class="card" href="backup.html">
+      <img src="https://img.icons8.com/ios-filled/100/ffffff/data-backup.png" alt="نسخ احتياطي">
+      <div>النسخ الاحتياطي</div>
+    </a>
+
+    <a class="card" href="stats.html">
+      <img src="https://img.icons8.com/ios-filled/100/ffffff/combo-chart.png" alt="إحصائيات">
+      <div>الإحصائيات والتقارير</div>
+    </a>
+
+    <a class="card" href="https://www.facebook.com/bdalrhmn.188128" target="_blank">
+      <img src="https://img.icons8.com/ios-filled/100/ffffff/code.png" alt="مطور">
+      <div>تواصل مع المطور</div>
+    </a>
+  </div>
+
+  <script>
+    let db;
+    // *** تم تحديث رقم الإصدار إلى 3 ***
+    const request = indexedDB.open("sectionsManagerDB", 3);
+
+    request.onupgradeneeded = function(event) {
+        // هذا يحدث إذا كان هناك محاولة لفتح إصدار أحدث مما هو موجود
+        console.warn("Database structure change detected. Aborting transaction.");
+        event.target.transaction.abort();
+        alert("تنبيه: تم تغيير هيكل قاعدة البيانات. يرجى العودة لصفحة التسجيل.");
+        window.location.href = "index.html";
+    };
+    
+    request.onsuccess = function(event) {
+      db = event.target.result;
+      loadUserData();
+    };
+
+    request.onerror = function(event) {
+      console.error("Error opening IndexedDB:", event.target.error);
+      document.getElementById("school-name-display").textContent = "خطأ في تحميل البيانات";
+      document.getElementById("manager-name-display").textContent = "غير معروف";
+      alert("تعذر الوصول لقاعدة البيانات. يرجى المحاولة مرة أخرى أو التأكد من تشغيل الصفحة عبر خادم ويب (HTTP).");
+    };
+
+    function loadUserData() {
+      // التحقق من أن قاعدة البيانات جاهزة
+      if (!db) {
+          console.error("DB not initialized.");
+          return;
+      }
+      
+      try {
+          const tx = db.transaction("users", "readonly");
+          const store = tx.objectStore("users");
+          const getAll = store.getAll();
+
+          getAll.onsuccess = function() {
+            if (getAll.result.length > 0) {
+              const user = getAll.result[0];
+              document.getElementById("school-name-display").textContent = user.school || "مدرسة غير معروفة";
+              document.getElementById("manager-name-display").textContent = user.manager || "المدير";
+            } else {
+              alert("لم يتم العثور على حساب. يرجى إنشاء حساب أولاً.");
+              window.location.href = "index.html";
+            }
+          };
+
+          getAll.onerror = function(event) {
+              console.error("Error retrieving user data:", event.target.error);
+              alert("خطأ في قراءة بيانات المستخدم.");
+              window.location.href = "index.html";
+          };
+
+      } catch(e) {
+          console.error("Failed to start transaction:", e);
+          alert("فشل في الوصول لمتجر المستخدمين. قد تكون بحاجة للتسجيل من جديد.");
+          window.location.href = "index.html";
+      }
+    }
+  </script>
+</body>
+</html>

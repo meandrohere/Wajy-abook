@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>صفحة متابعة الديون المستحقة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 { 
+            text-align: center; 
+            font-size: 32px; 
+            margin-bottom: 30px; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            color: #ff9800;
+        }
+        .tracker-container {
+            max-width: 1000px; /* تم التوسيع للجدول الجديد */
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        
+        /* تنسيق الجدول */
+        .debt-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
+            font-size: 15px;
+            background: #fff;
+            color: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        .debt-table th, .debt-table td {
+            border: 1px solid #ddd;
+            padding: 12px 15px;
+        }
+        .debt-table th {
+            background-color: #f2f2f2;
+            color: #333;
+            font-weight: bold;
+        }
+        .debt-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .debt-table tr:hover {
+            background-color: #ffe0b2;
+        }
+        .debt-amount {
+            font-weight: bold;
+            color: #f44336; /* لون أحمر للمبلغ */
+        }
+
+        button {
+            background: #2196f3; 
+            color: white; 
+            font-weight: bold; 
+            padding: 10px 30px;
+            margin-top: 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: block;
+            width: fit-content;
+        }
+        button:hover {
+            filter: brightness(1.1);
+        }
+        
+        #loading-message {
+            text-align: center;
+            color: #fff;
+            font-size: 18px;
+            padding: 50px;
+        }
+    </style>
+</head>
+<body onload="loadDebtTracker()">
+
+    <div class="tracker-container">
+        <h1>💰 صفحة متابعة الديون المستحقة</h1>
+        
+        <div id="debtListContainer">
+            <p id="loading-message">جاري تحميل البيانات من قاعدة البيانات...</p>
+        </div>
+
+        <button onclick="window.location.href='index.html'">
+            العودة للصفحة الرئيسية
+        </button>
+    </div>
+
+    <script>
+        let db;
+        const DB_NAME = "AttendanceSystemDB";
+        const DB_VERSION = 4; // يجب أن يتطابق مع الإصدار الجديد في الصفحة الرئيسية
+
+        function connectDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onupgradeneeded = e => {
+                    resolve(e.target.result); 
+                };
+
+                request.onsuccess = e => {
+                    resolve(e.target.result);
+                };
+
+                request.onerror = e => {
+                    reject("فشل في الاتصال بقاعدة البيانات. تأكد من زيارة الصفحة الرئيسية أولاً.");
+                };
+            });
+        }
+
+        async function loadDebtTracker() {
+            const container = document.getElementById('debtListContainer');
+            let totalDebt = 0;
+
+            try {
+                db = await connectDB();
+            } catch (error) {
+                container.innerHTML = `<p style="text-align:center; color:#f44336; font-size:18px; padding: 50px; background: #fff; border-radius: 10px;">⚠️ خطأ في الاتصال: ${error}</p>`;
+                return;
+            }
+
+            const tx = db.transaction("teachers", "readonly");
+            tx.objectStore("teachers").getAll().onsuccess = e => {
+                const teachers = e.target.result;
+                const debtStudents = [];
+
+                // تجميع الطلاب الذين عليهم ديون وحساب المبلغ
+                teachers.forEach(teacher => {
+                    const pricePerClass = teacher.pricePerClass || 0;
+                    const pricePer4Classes = teacher.pricePer4Classes || 0;
+
+                    teacher.students.forEach(student => {
+                        if (student.debtPaid === false && (student.debtClassesCount > 0 || student.attendance.some(s => s !== 'transparent'))) {
+                            
+                            // عدد الحصص الحالية التي تم تسجيلها ولم يتم تجديدها بعد
+                            const currentClasses = student.attendance.filter(status => status !== "transparent").length;
+                            
+                            // العدد الإجمالي للحصص المستحقة (من الأشهر السابقة + الشهر الحالي)
+                            const totalDebtClasses = (student.debtClassesCount || 0) + currentClasses;
+
+                            let debtAmount = 0;
+
+                            // حساب المبلغ المستحق
+                            if (totalDebtClasses >= 4 && pricePer4Classes > 0) {
+                                // نحسب المبلغ على أساس سعر الباقة إذا كان هناك سعر للباقة وتم تجاوز 4 حصص
+                                const fullPacks = Math.floor(totalDebtClasses / 4);
+                                const remainder = totalDebtClasses % 4;
+                                debtAmount = (fullPacks * pricePer4Classes) + (remainder * pricePerClass);
+                            } else {
+                                // نحسب المبلغ على أساس سعر الحصة
+                                debtAmount = totalDebtClasses * pricePerClass;
+                            }
+                            
+                            totalDebt += debtAmount;
+
+                            debtStudents.push({
+                                studentName: student.name,
+                                teacherName: teacher.name,
+                                subject: teacher.subject,
+                                debtClasses: totalDebtClasses,
+                                debtAmount: debtAmount.toFixed(2)
+                            });
+                        }
+                    });
+                });
+
+                // عرض النتائج
+                if (debtStudents.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; color:#4caf50; font-size:18px; padding: 50px; background: #fff; border-radius: 10px;">🎉 لا يوجد طلاب عليهم ديون حالياً. كل شيء مدفوع!</p>';
+                } else {
+                    let tableHTML = `
+                        <p style="margin-bottom: 15px; font-weight: bold; font-size: 20px; color: white;">إجمالي عدد الديون: ${debtStudents.length}</p>
+                        <p style="margin-bottom: 15px; font-weight: bold; font-size: 20px; color: #ffeb3b;">المبلغ الإجمالي المستحق: ${totalDebt.toFixed(2)}</p>
+                        <table class="debt-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>اسم التلميذ</th>
+                                    <th>الأستاذ (المادة)</th>
+                                    <th>عدد الحصص المديون بها</th>
+                                    <th>المبلغ المستحق</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    debtStudents.forEach((d, index) => {
+                        tableHTML += `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${d.studentName}</td>
+                                <td>${d.teacherName} (${d.subject})</td>
+                                <td>${d.debtClasses}</td>
+                                <td class="debt-amount">${d.debtAmount}</td>
+                            </tr>
+                        `;
+                    });
+                    tableHTML += `
+                            </tbody>
+                        </table>
+                    `;
+                    container.innerHTML = tableHTML;
+                }
+            };
+        }
+    </script>
+</body>
+</html>
